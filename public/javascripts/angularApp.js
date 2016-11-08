@@ -29,13 +29,42 @@ function($stateProvider, $urlRouterProvider) {
 app.factory('posts', ['$http', function($http){
 
   var o = {
-    posts: []
+    posts: [],
+    post: []
   };
 
   o.getAll = function() {
     return $http.get('/posts').success(function(data){
       angular.copy(data, o.posts);
     });
+  };
+
+  o.create = function(post) {
+    return $http.post('/posts', post).success(function(data){
+      o.posts.push(data);
+    });
+  };
+
+  o.upvote = function(post) {
+    return $http.put('/posts/' + post._id + '/upvote')
+      .success(function(data){
+        post.upvotes += 1;
+      });
+  };
+
+  o.get = function(id) {
+    return $http.get('/posts/' + id);
+  };
+
+  o.addComment = function(id, comment) {
+    return $http.post('/posts/' + id + '/comments', comment);
+  };
+
+  o.upvoteComment = function(post, comment) {
+    return $http.put('/posts/' + post._id + '/comments/'+ comment._id + '/upvote')
+      .success(function(data){
+        comment.upvotes += 1;
+      });
   };
 
   return o;
@@ -48,37 +77,44 @@ app.controller('MainCtrl', ['$scope', 'posts', function($scope, posts){
 
   $scope.addPost = function(){
     if(!$scope.title || $scope.title === '') { return; }
-    $scope.posts.push({
+    posts.create({
       title: $scope.title,
       link: $scope.link,
-      upvotes: 0,
-      comments: [
-        {author: 'Joe', body: 'Cool post!', upvotes: 0},
-        {author: 'Bob', body: 'Great idea but everything is wrong!', upvotes: 0}
-      ]
     });
     $scope.title = '';
     $scope.link = '';
   };
 
   $scope.incrementUpvotes = function(post) {
-    post.upvotes += 1;
+    posts.upvote(post);
   };
 
 }]);
 
-app.controller('PostsCtrl', ['$scope', '$stateParams', 'posts', function($scope, $stateParams, posts){
+app.controller('PostsCtrl', ['$scope', 'posts', '$stateParams', function($scope, posts, $stateParams){
 
-  $scope.post = posts.posts[$stateParams.id];
+  $scope.post = [];
+
+  $scope.getPost = function() {
+    posts.get($stateParams.id).then(function(res) {
+      $scope.post = res.data;
+    });
+  };
+  $scope.getPost();
 
   $scope.addComment = function(){
     if($scope.body === '') { return; }
-    $scope.post.comments.push({
+    posts.addComment($scope.post._id, {
       body: $scope.body,
       author: 'user',
-      upvotes: 0
+    }).success(function(comment) {
+      $scope.post.comments.push(comment);
     });
     $scope.body = '';
+  };
+
+  $scope.incrementUpvotes = function(comment){
+    posts.upvoteComment($scope.post, comment);
   };
 
 }]);
